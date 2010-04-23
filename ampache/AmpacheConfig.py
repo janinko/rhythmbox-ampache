@@ -18,7 +18,7 @@ class AmpacheConfig(object):
 
 		# Defaults ("hidden" options)
 		self.set("name", "Ampache")
-		self.set("group", "Library")
+		self.set("group", "Shared")
 
 		self.set("icon", "ampache.ico")
 

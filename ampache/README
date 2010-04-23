@@ -1,45 +1,74 @@
-INFO
+		INFO
+
+	Ampache setup
+
+Read Ampache Access Control Lists documentation and create an ACL for RPC (XML API)
+	http://trac.ampache.org/wiki/ConfigAcl
+
+	Rhythmbox setup
 
 Untar and put the ampache directory into $HOME/.gnome2/rhythmbox/plugins
 or /usr/lib/rhythmbox/plugins
 
 Run rhythmbox (preferable with "-D ampache" from command line)
 
-Open Edit -> Plugins dialo box, enable " Ampache Library"
+Click Edit, select Plugins dialog box, enable "Ampache Library"
 
 Click Configure, enter your infromation, for example URL:
-	http://test.com/server/xml.server.xml
+	http://test.com/server/xml.server.php
 
-Clock on Ampache under Library, songs should appear in the browser
+Click on Ampache under Library, songs should appear in the browser
 (possibly with a large delay as it synchronosly downloads the data)
 
-Seva <seva@sevatech.com>
+		TODO/BUGS/FIXME
 
-TODO
+ - Store usernames and passwords in gnome-keyring
+ - Allow multiple instances of ampache
+ - Support playlists
 
-COPYRIGHT
+ - Use async I/O
+ - Use limit= and offset= to get songs in chunks and db.commit() inbetween
 
-# Copyright (C) 2008 Seva <seva@sevatech.com>
-#
-# Portions from Magnatune Rhythmbox plugin
-# Copyright (C) 2006 Adam Zimmerman <adam_zimmerman@sfu.ca>
-# Copyright (C) 2006 James Livingston  <doclivingston@gmail.com>
-#
-# Portions from 'git clone http://quickplay.isfound.at'
-# Copyright (C) 2008 Kevin James Purdy irc://irc.freenode.org/purdyk,isnick
+ - Fix gengres - shows up as numbers right now
+ - Fix date - not implemented in Ampache yet
 
-LICENSE
+ - Use gnome-keyring for username and password
+ - Don't store constants that are not settings in gconf
 
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2, or (at your option)
-# any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA.
+ - Figured out why "-D ampache" doesn't work if I run rhythmbox from ampache
+   plugin directory
+
+ - Remember View->Browse state
+
+ - Try to keep the catalog persistent (add api to ampache to version catalogs?)
+
+ - Figure out why dragging song to local library works but to iPod does not
+
+ - Fix RB sorting to ignore articles (the, a, etc - ampache has a good list)
+
+		COPYRIGHT
+
+Copyright (C) 2008 Seva <seva@sevatech.com>
+
+Portions from Magnatune Rhythmbox plugin
+Copyright (C) 2006 Adam Zimmerman <adam_zimmerman@sfu.ca>
+Copyright (C) 2006 James Livingston <doclivingston@gmail.com>
+
+Portions from 'git clone http://quickplay.isfound.at'
+Copyright (C) 2008 Kevin James Purdy irc://irc.freenode.org/purdyk,isnick
+
+		LICENSE
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2, or (at your option)
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA.

@@ -2,8 +2,6 @@ import gtk, gtk.glade
 
 class AmpacheConfigDialog(object):
 	def __init__(self, glade_file, config):
-		print "INFO: ampache config dialog init"
-
 		self.gladexml = gtk.glade.XML(glade_file)
 		self.config = config
 		self.config_dialog = self.gladexml.get_widget("preferences_dialog")
@@ -20,21 +18,13 @@ class AmpacheConfigDialog(object):
 		self.config_dialog.connect("response", self.dialog_response)
 
 	def get_dialog(self):
-		print "INFO: ampache get_dialog()"
-
 		return self.config_dialog
 
 	def dialog_response(self, dialog, response):
-		print "INFO: ampache dialog_response()"
-
 		if response == gtk.RESPONSE_OK:
 			self.config.set("url", self.url.get_text())
 			self.config.set("username", self.username.get_text())
 			self.config.set("password", self.password.get_text())
-
-			#if self.url.get_text():
-			#if self.username.get_text():
-			#if self.password.get_text():
 
 			self.config_dialog.hide()
 
@@ -42,5 +32,5 @@ class AmpacheConfigDialog(object):
 			self.config_dialog.hide()
 
 		else:
-			print "WARNING: unexpected response type in dialog_response"
+			print "unexpected response type in dialog_response"
 			self.config_dialog.hide()

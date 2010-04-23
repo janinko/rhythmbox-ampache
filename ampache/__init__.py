@@ -1,29 +1,4 @@
 # -*- Mode: python; coding: utf-8; tab-width: 8; indent-tabs-mode: t; -*-
-#
-#
-# Copyright (C) 2008 Seva <seva@sevatech.com>
-#
-# Portions from Magnatune Rhythmbox plugin
-# Copyright (C) 2006 Adam Zimmerman <adam_zimmerman@sfu.ca>
-# Copyright (C) 2006 James Livingston  <doclivingston@gmail.com>
-#
-# Portions from 'git clone http://quickplay.isfound.at'
-# Copyright (C) 2008 Kevin James Purdy irc://irc.freenode.org/purdyk,isnick
-#
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2, or (at your option)
-# any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA.
 
 import rhythmdb, rb
 import gobject
@@ -34,15 +9,11 @@ from AmpacheBrowser import AmpacheBrowser
 
 class Ampache(rb.Plugin):
 	def __init__(self):
-		print "INFO: ampache plugin init"
-
 		self.config = AmpacheConfig()
 
 		rb.Plugin.__init__(self)
 
 	def activate(self, shell):
-		print "INFO: activating ampache plugin"
-
 		self.db = shell.props.db
 
 		self.entry_type = self.db.entry_register_type("AmpacheEntryType")
@@ -74,8 +45,6 @@ class Ampache(rb.Plugin):
 		shell.append_source(self.source, None)
 
 	def deactivate(self, shell):
-		print "INFO: deactivating ampache plugin"
-
 		self.db.entry_delete_by_type(self.entry_type)
 
                 self.db.commit()
@@ -87,8 +56,6 @@ class Ampache(rb.Plugin):
                 self.source = None
 
 	def create_configure_dialog(self):
-		print "INFO: creating configure dialog"
-
 		glade_file = self.find_file("ampache-prefs.glade")
 
 		if glade_file:
@@ -97,5 +64,5 @@ class Ampache(rb.Plugin):
 		if dialog:
 			return dialog
 		else:
-			print "ERROR: couldn't create configure dialog"
+			print "couldn't create configure dialog"
 			return None

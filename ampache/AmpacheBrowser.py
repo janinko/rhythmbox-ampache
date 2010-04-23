@@ -27,8 +27,8 @@ class AmpacheBrowser(rb.BrowserSource):
 
 		self.__activate = False
 
+	# need if we use find_file
 	def do_set_property(self, property, value):
-		# No idea what this is
 		if property.name == 'plugin':
 			self.__plugin = value
 		else:
@@ -44,7 +44,7 @@ class AmpacheBrowser(rb.BrowserSource):
 		username = self.config.get("username")
 		password = self.config.get("password")
 
-		print "URL is %s" % url
+		#print "URL is %s" % url
 
 		timestamp = int(time.time())
 		auth_xml = urllib2.urlopen("%s?action=handshake&user=%s&auth=%s&timestamp=%s" % (url, username, md5.md5(str(timestamp) + password).hexdigest(), timestamp)).read()
@@ -52,51 +52,59 @@ class AmpacheBrowser(rb.BrowserSource):
 		auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
 
 		print "Auth: %s" % auth
-		print "Getting songs... will take a while"
 
-		songs_xml = urllib2.urlopen("%s?limit=2&action=songs&auth=%s" % (url, auth)).read()
-		#print "Songs?: %s" % songs_xml
+		#songs_xml = urllib2.urlopen("%s?offset=%s&limit=%s&action=songs&auth=%s" % (url, offset, limit, auth)).read()
+		#print "Blah %s" % songs_xml
 
-		#e = self.db.entry_new(self.entry_type, "http://192.168.11.176/play/....mp3")
-		#self.db.set(e, rhythmdb.PROP_DATE, datetime.date(1999, 1, 1).toordinal())
-		#self.db.set(e, rhythmdb.PROP_TITLE, "Blah")
-		#self.db.set(e, rhythmdb.PROP_ARTIST, "Blah")
-		#self.db.set(e, rhythmdb.PROP_ALBUM, "Blah")
-		# rhythmdb.PROP_DURATION
-		#self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, 1)
-		# rhythmdb.PROP_GENRE
-		# rhythmdb.PROP_MUSICBRAINZ_ALBUMID
+		limit = 1000
+		offset = 0
 
-		dom = xml.dom.minidom.parseString(songs_xml)
-		for node in dom.getElementsByTagName("song"):
-			id = node.getAttribute("id")
-			title = node.getElementsByTagName("title")[0].childNodes[0].data
-			artist = node.getElementsByTagName("artist")[0].childNodes[0].data
-			album = node.getElementsByTagName("album")[0].childNodes[0].data
-			genre = node.getElementsByTagName("genre")[0].childNodes[0].data
-			track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
-			duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
-			url = node.getElementsByTagName("url")[0].childNodes[0].data
+		# FIXME ugly, i know
+		while True:
+			print "offset: %s, limit: %s" % (offset, limit)
+			request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (url, offset, limit, auth)
+			songs_xml = urllib2.urlopen(request).read()
+			song = 0
 
-			#print "Processing %s - %s" % (artist, album) #DEBUG
+			dom = xml.dom.minidom.parseString(songs_xml)
+			for node in dom.getElementsByTagName("song"):
+				song = song + 1
 
-			e = self.db.entry_new(self.entry_type, url)
-			self.db.set(e, rhythmdb.PROP_TITLE, title)
-			self.db.set(e, rhythmdb.PROP_ARTIST, artist)
-			self.db.set(e, rhythmdb.PROP_ALBUM, album)
-			self.db.set(e, rhythmdb.PROP_GENRE, genre)
-			self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, track_number)
-			self.db.set(e, rhythmdb.PROP_DURATION, duration)
-			self.db.set(e, rhythmdb.PROP_DATE, datetime.date(2000, 1, 1).toordinal())
+				e_id = node.getAttribute("id")
 
-		self.db.commit()
+				e_url = node.getElementsByTagName("url")[0].childNodes[0].data
+				e_title = node.getElementsByTagName("title")[0].childNodes[0].data
+				e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
+				e_album = node.getElementsByTagName("album")[0].childNodes[0].data
+				e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
+				e_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
+				e_duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
 
+				#print "Processing %s - %s" % (artist, album) #DEBUG
+
+				e = self.db.entry_new(self.entry_type, e_url)
+				self.db.set(e, rhythmdb.PROP_TITLE, e_title)
+				self.db.set(e, rhythmdb.PROP_ARTIST, e_artist)
+				self.db.set(e, rhythmdb.PROP_ALBUM, e_album)
+				self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
+				self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, e_track_number)
+				self.db.set(e, rhythmdb.PROP_DURATION, e_duration)
+				# FIXME date - not implemented in ampache yet
+				#self.db.set(e, rhythmdb.PROP_DATE, datetime.date(2000, 1, 1).toordinal())
+
+
+			self.db.commit()
+
+			if (song < limit):
+				break
+			else:
+				offset = offset + song
+
+	# Source is first clicked on
 	def do_impl_activate (self):
-		# Source is first clicked on
 
-		# Connect to Ampache
+		# Connect to Ampache if not already
 		if not self.__activate:
-			print "INFO: AmpacheBrowser activated"
 			self.__activate = True
 			self.load_db()
 
