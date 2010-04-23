@@ -4,6 +4,7 @@ import gobject
 import gtk
 #import gnomevfs, gnome
 import datetime
+import hashlib
 
 class AmpacheBrowser(rb.BrowserSource):
 	__gproperties__ = {
@@ -49,10 +50,11 @@ class AmpacheBrowser(rb.BrowserSource):
 
 		if not password:
 			return
-		
-
 		timestamp = int(time.time())
-		auth_xml = urllib2.urlopen("%s?action=handshake&user=%s&auth=%s&timestamp=%s" % (url, username, md5.md5(str(timestamp) + password).hexdigest(), timestamp)).read()
+		password = hashlib.sha256(password).hexdigest()
+		authkey = hashlib.sha256(str(timestamp) + password).hexdigest()
+
+		auth_xml = urllib2.urlopen("%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username)).read()
 		dom = xml.dom.minidom.parseString(auth_xml)
 		auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
 
@@ -79,7 +81,7 @@ class AmpacheBrowser(rb.BrowserSource):
 				e_title = node.getElementsByTagName("title")[0].childNodes[0].data
 				e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
 				e_album = node.getElementsByTagName("album")[0].childNodes[0].data
-				e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
+				#e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
 				e_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
 				e_duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
 
@@ -89,7 +91,7 @@ class AmpacheBrowser(rb.BrowserSource):
 				self.db.set(e, rhythmdb.PROP_TITLE, e_title)
 				self.db.set(e, rhythmdb.PROP_ARTIST, e_artist)
 				self.db.set(e, rhythmdb.PROP_ALBUM, e_album)
-				self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
+				#self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
 				self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, e_track_number)
 				self.db.set(e, rhythmdb.PROP_DURATION, e_duration)
 				# FIXME date - not implemented in ampache yet
