@@ -44,7 +44,12 @@ class AmpacheBrowser(rb.BrowserSource):
 		username = self.config.get("username")
 		password = self.config.get("password")
 
-		#print "URL is %s" % url
+		if not url:
+			return
+
+		if not password:
+			return
+		
 
 		timestamp = int(time.time())
 		auth_xml = urllib2.urlopen("%s?action=handshake&user=%s&auth=%s&timestamp=%s" % (url, username, md5.md5(str(timestamp) + password).hexdigest(), timestamp)).read()
@@ -53,9 +58,6 @@ class AmpacheBrowser(rb.BrowserSource):
 
 		print "Auth: %s" % auth
 
-		#songs_xml = urllib2.urlopen("%s?offset=%s&limit=%s&action=songs&auth=%s" % (url, offset, limit, auth)).read()
-		#print "Blah %s" % songs_xml
-
 		limit = 1000
 		offset = 0
 
@@ -63,6 +65,7 @@ class AmpacheBrowser(rb.BrowserSource):
 		while True:
 			print "offset: %s, limit: %s" % (offset, limit)
 			request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (url, offset, limit, auth)
+			print "url: %s" % request
 			songs_xml = urllib2.urlopen(request).read()
 			song = 0
 

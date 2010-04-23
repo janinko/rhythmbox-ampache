@@ -23,7 +23,10 @@ class AmpacheConfig(object):
 		self.set("icon", "ampache.ico")
 
 	def get(self, key):
-		return self.gconf.get_string(self.gconf_keys[key])
+		if self.gconf.get_string(self.gconf_keys[key]):
+			return self.gconf.get_string(self.gconf_keys[key])
+		else:
+			return ""
 
 	def set(self, key, value):
 		self.gconf.set_string(self.gconf_keys[key], value)
