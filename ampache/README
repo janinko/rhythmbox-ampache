@@ -57,6 +57,17 @@ TODO/BUGS/FIXME
 
 COPYRIGHT
 
+20-04-2010 - Philip Langdale <philipl@overt.org>
+
+I did some work over the weekend to fix the blocking nature of
+the plugin. I switched to using async gio to make the http
+transfers and dropped the per-request limit to 100. The net
+result is a much more responsive UI that also shows progress
+more often.
+
+I also fixed the reference leaks that prevent rhythmbox
+exiting with the plugin today.
+
 19-04-2010 - Graham Grindlay <grindlay@ee.columbia.edu> 
   * Added a few small fixes to keep the plugin from choking on bad/empty tag data. 
   * Genre tags didn't seem to be coming through properly so I set them using the "tag"

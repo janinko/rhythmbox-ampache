@@ -46,13 +46,14 @@ class Ampache(rb.Plugin):
 
 	def deactivate(self, shell):
 		self.db.entry_delete_by_type(self.entry_type)
-
                 self.db.commit()
+                del self.db
                 self.db = None
 
                 self.entry_type = None
 
                 self.source.delete_thyself()
+                del self.source
                 self.source = None
 
 	def create_configure_dialog(self):

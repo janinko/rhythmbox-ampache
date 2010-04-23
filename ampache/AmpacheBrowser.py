@@ -2,11 +2,17 @@ import rb, rhythmdb
 
 import gobject
 import gtk
-#import gnomevfs, gnome
+import gio
 import datetime
 import hashlib
 
 class AmpacheBrowser(rb.BrowserSource):
+	limit = 100
+	offset = 0
+	url = ''
+	auth = None
+	auth_stream = None
+
 	__gproperties__ = {
 		'plugin': (rb.Plugin, 'plugin', 'plugin', gobject.PARAM_WRITABLE|gobject.PARAM_CONSTRUCT_ONLY),
 	}
@@ -22,8 +28,8 @@ class AmpacheBrowser(rb.BrowserSource):
 		icon = gtk.gdk.pixbuf_new_from_file_at_size(self.config.get("icon_filename"), width, height)
 		self.set_property( "icon",  icon) 
 
-		self.shell = self.get_property("shell")
-		self.db = self.shell.get_property("db")
+		shell = self.get_property("shell")
+		self.db = shell.get_property("db")
 		self.entry_type = self.get_property("entry-type")
 
 		self.__activate = False
@@ -35,11 +41,14 @@ class AmpacheBrowser(rb.BrowserSource):
 		else:
 			raise AttributeError, 'unknown property %s' % property.name
 
+        def do_impl_get_browser_key(self):
+                return "/apps/rhythmbox/plugins/ampache/show_browser"
+
+        def do_impl_get_paned_key(self):
+                return "/apps/rhythmbox/plugins/ampache/paned_position"
+
 	def load_db(self):
-		import urllib2
 		import time
-		import md5
-		import xml.dom.minidom
 
 		url = self.config.get("url")
 		username = self.config.get("username")
@@ -54,110 +63,132 @@ class AmpacheBrowser(rb.BrowserSource):
 		password = hashlib.sha256(password).hexdigest()
 		authkey = hashlib.sha256(str(timestamp) + password).hexdigest()
 
-		auth_xml = urllib2.urlopen("%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username)).read()
+		self.auth_stream = gio.File("%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username))
+		self.auth_stream.read_async(self.load_db_cb)
+		self.url = url
+
+	def load_db_cb(self, gdaemonfile, result):
+		import xml.dom.minidom
+
+		auth_xml = self.auth_stream.read_finish(result).read()
+		self.auth_stream = None
+
 		dom = xml.dom.minidom.parseString(auth_xml)
-		auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
+		self.auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
 
-		print "Auth: %s" % auth
+		print "Auth: %s" % self.auth
+		#gobject.idle_add(self.populate)
+		self.populate()
 
-		limit = 1000
-		offset = 0
+	def populate(self):
+		#gtk.gdk.threads_enter()
 
-		# FIXME ugly, i know
-		while True:
-			print "offset: %s, limit: %s" % (offset, limit)
-			request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (url, offset, limit, auth)
-			print "url: %s" % request
-			songs_xml = urllib2.urlopen(request).read()
-			song = 0
+		print "offset: %s, limit: %s" % (self.offset, self.limit)
+		request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (self.url, self.offset, self.limit, self.auth)
+		print "url: %s" % request
 
-			dom = xml.dom.minidom.parseString(songs_xml)
-			for node in dom.getElementsByTagName("song"):
-				song = song + 1
+		self.songs_stream = gio.File(request)
+		self.songs_stream.read_async(self.populate_cb)
 
-				e_id = node.getAttribute("id")
+	def populate_cb(self, gdaemonfile, result):
+		import xml.dom.minidom
 
-				tmp = node.getElementsByTagName("url")
-				if tmp == []:
-					e_url = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
-				else:
-					if tmp[0].childNodes == []:
-						e_url = 0;
-					else:
-						e_url = tmp[0].childNodes[0].data
-				#e_url = node.getElementsByTagName("url")[0].childNodes[0].data
-				
+		songs_xml = self.songs_stream.read_finish(result).read()
+		self.songs_stream = None
 
-				tmp = node.getElementsByTagName("title")
-				if tmp == []:
-					e_title = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
-				else:
-					if tmp[0].childNodes == []:
-						e_title = 0;
-					else:
-						e_title = tmp[0].childNodes[0].data
-				#e_title = node.getElementsByTagName("title")[0].childNodes[0].data
-				#print "title: %s" % e_title
+		song = 0
 
+		dom = xml.dom.minidom.parseString(songs_xml)
+		for node in dom.getElementsByTagName("song"):
+			song = song + 1
 
-				tmp = node.getElementsByTagName("artist")
-				if tmp == []:
-					e_artist = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
-				else:
-					if tmp[0].childNodes == []:
-						e_artist = 0;
-					else:
-						e_artist = tmp[0].childNodes[0].data
-				#e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
-				#print "artist: %s" % e_artist
-				
-				
-				tmp = node.getElementsByTagName("album")
-				if tmp == []:
-					e_album = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
-				else:
-					if tmp[0].childNodes == []:
-						e_album = 0;
-					else:
-						e_album = tmp[0].childNodes[0].data
-				#e_album = node.getElementsByTagName("album")[0].childNodes[0].data
-				#print "album: %s" % e_album
+			e_id = node.getAttribute("id")
 
-				
-				tmp = node.getElementsByTagName("tag")
-				if tmp == []:
-					e_genre = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
-				else:
-					if tmp[0].childNodes == []:
-						e_genre = 0;
-					else:
-						e_genre = tmp[0].childNodes[0].data
-				#e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
-				#print "genre: %s" % e_genre
-
-
-				e_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
-				e_duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
-
-				#print "Processing %s - %s" % (artist, album) #DEBUG
-
-				e = self.db.entry_new(self.entry_type, e_url)
-				self.db.set(e, rhythmdb.PROP_TITLE, e_title)
-				self.db.set(e, rhythmdb.PROP_ARTIST, e_artist)
-				self.db.set(e, rhythmdb.PROP_ALBUM, e_album)
-				self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
-				self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, e_track_number)
-				self.db.set(e, rhythmdb.PROP_DURATION, e_duration)
-				# FIXME date - not implemented in ampache yet
-				#self.db.set(e, rhythmdb.PROP_DATE, datetime.date(2000, 1, 1).toordinal())
-
-
-			self.db.commit()
-
-			if (song < limit):
-				break
+			tmp = node.getElementsByTagName("url")
+			if tmp == []:
+				e_url = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
 			else:
-				offset = offset + song
+				if tmp[0].childNodes == []:
+					e_url = 0;
+				else:
+					e_url = tmp[0].childNodes[0].data
+			#e_url = node.getElementsByTagName("url")[0].childNodes[0].data
+				
+
+			tmp = node.getElementsByTagName("title")
+			if tmp == []:
+				e_title = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+			else:
+				if tmp[0].childNodes == []:
+					e_title = 0;
+				else:
+					e_title = tmp[0].childNodes[0].data
+			#e_title = node.getElementsByTagName("title")[0].childNodes[0].data
+			#print "title: %s" % e_title
+
+
+			tmp = node.getElementsByTagName("artist")
+			if tmp == []:
+				e_artist = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+			else:
+				if tmp[0].childNodes == []:
+					e_artist = 0;
+				else:
+					e_artist = tmp[0].childNodes[0].data
+			#e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
+			#print "artist: %s" % e_artist
+				
+				
+			tmp = node.getElementsByTagName("album")
+			if tmp == []:
+				e_album = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+			else:
+				if tmp[0].childNodes == []:
+					e_album = 0;
+				else:
+					e_album = tmp[0].childNodes[0].data
+			#e_album = node.getElementsByTagName("album")[0].childNodes[0].data
+			#print "album: %s" % e_album
+
+				
+			tmp = node.getElementsByTagName("tag")
+			if tmp == []:
+				e_genre = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+			else:
+				if tmp[0].childNodes == []:
+					e_genre = 0;
+				else:
+					e_genre = tmp[0].childNodes[0].data
+			#e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
+			#print "genre: %s" % e_genre
+
+
+			e_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
+			e_duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
+
+			#print "Processing %s - %s" % (artist, album) #DEBUG
+
+			e = self.db.entry_new(self.entry_type, e_url)
+			self.db.set(e, rhythmdb.PROP_TITLE, e_title)
+			self.db.set(e, rhythmdb.PROP_ARTIST, e_artist)
+			self.db.set(e, rhythmdb.PROP_ALBUM, e_album)
+			self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
+			self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, e_track_number)
+			self.db.set(e, rhythmdb.PROP_DURATION, e_duration)
+			# FIXME date - not implemented in ampache yet
+			#self.db.set(e, rhythmdb.PROP_DATE, datetime.date(2000, 1, 1).toordinal())
+
+		self.db.commit()
+
+		if (song < self.limit):
+			#gtk.gdk.threads_leave()
+			return False
+		else:
+			self.offset = self.offset + song
+		#gtk.gdk.threads_leave()
+		self.populate()
+		return True
+
 
 	# Source is first clicked on
 	def do_impl_activate (self):
