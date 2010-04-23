@@ -1,0 +1,45 @@
+INFO
+
+Untar and put the ampache directory into $HOME/.gnome2/rhythmbox/plugins
+or /usr/lib/rhythmbox/plugins
+
+Run rhythmbox (preferable with "-D ampache" from command line)
+
+Open Edit -> Plugins dialo box, enable " Ampache Library"
+
+Click Configure, enter your infromation, for example URL:
+	http://test.com/server/xml.server.xml
+
+Clock on Ampache under Library, songs should appear in the browser
+(possibly with a large delay as it synchronosly downloads the data)
+
+Seva <seva@sevatech.com>
+
+TODO
+
+COPYRIGHT
+
+# Copyright (C) 2008 Seva <seva@sevatech.com>
+#
+# Portions from Magnatune Rhythmbox plugin
+# Copyright (C) 2006 Adam Zimmerman <adam_zimmerman@sfu.ca>
+# Copyright (C) 2006 James Livingston  <doclivingston@gmail.com>
+#
+# Portions from 'git clone http://quickplay.isfound.at'
+# Copyright (C) 2008 Kevin James Purdy irc://irc.freenode.org/purdyk,isnick
+
+LICENSE
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA.
