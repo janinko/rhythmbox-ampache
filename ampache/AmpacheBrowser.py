@@ -77,11 +77,65 @@ class AmpacheBrowser(rb.BrowserSource):
 
 				e_id = node.getAttribute("id")
 
-				e_url = node.getElementsByTagName("url")[0].childNodes[0].data
-				e_title = node.getElementsByTagName("title")[0].childNodes[0].data
-				e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
-				e_album = node.getElementsByTagName("album")[0].childNodes[0].data
+				tmp = node.getElementsByTagName("url")
+				if tmp == []:
+					e_url = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+				else:
+					if tmp[0].childNodes == []:
+						e_url = 0;
+					else:
+						e_url = tmp[0].childNodes[0].data
+				#e_url = node.getElementsByTagName("url")[0].childNodes[0].data
+				
+
+				tmp = node.getElementsByTagName("title")
+				if tmp == []:
+					e_title = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+				else:
+					if tmp[0].childNodes == []:
+						e_title = 0;
+					else:
+						e_title = tmp[0].childNodes[0].data
+				#e_title = node.getElementsByTagName("title")[0].childNodes[0].data
+				#print "title: %s" % e_title
+
+
+				tmp = node.getElementsByTagName("artist")
+				if tmp == []:
+					e_artist = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+				else:
+					if tmp[0].childNodes == []:
+						e_artist = 0;
+					else:
+						e_artist = tmp[0].childNodes[0].data
+				#e_artist = node.getElementsByTagName("artist")[0].childNodes[0].data
+				#print "artist: %s" % e_artist
+				
+				
+				tmp = node.getElementsByTagName("album")
+				if tmp == []:
+					e_album = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+				else:
+					if tmp[0].childNodes == []:
+						e_album = 0;
+					else:
+						e_album = tmp[0].childNodes[0].data
+				#e_album = node.getElementsByTagName("album")[0].childNodes[0].data
+				#print "album: %s" % e_album
+
+				
+				tmp = node.getElementsByTagName("tag")
+				if tmp == []:
+					e_genre = 0#node.getElementsByTagName("genre")[0].childNodes[0].data
+				else:
+					if tmp[0].childNodes == []:
+						e_genre = 0;
+					else:
+						e_genre = tmp[0].childNodes[0].data
 				#e_genre = node.getElementsByTagName("genre")[0].childNodes[0].data
+				#print "genre: %s" % e_genre
+
+
 				e_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
 				e_duration = int(node.getElementsByTagName("time")[0].childNodes[0].data)
 
@@ -91,7 +145,7 @@ class AmpacheBrowser(rb.BrowserSource):
 				self.db.set(e, rhythmdb.PROP_TITLE, e_title)
 				self.db.set(e, rhythmdb.PROP_ARTIST, e_artist)
 				self.db.set(e, rhythmdb.PROP_ALBUM, e_album)
-				#self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
+				self.db.set(e, rhythmdb.PROP_GENRE, e_genre)
 				self.db.set(e, rhythmdb.PROP_TRACK_NUMBER, e_track_number)
 				self.db.set(e, rhythmdb.PROP_DURATION, e_duration)
 				# FIXME date - not implemented in ampache yet
