@@ -2,7 +2,6 @@ import rb, rhythmdb
 
 import gobject
 import gtk
-import gio
 import datetime
 import hashlib
 
@@ -63,17 +62,21 @@ class AmpacheBrowser(rb.BrowserSource):
 		password = hashlib.sha256(password).hexdigest()
 		authkey = hashlib.sha256(str(timestamp) + password).hexdigest()
 
-		self.auth_stream = gio.File("%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username))
-		self.auth_stream.read_async(self.load_db_cb)
+		auth_url = "%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username)
 		self.url = url
+		rb.Loader().get_url(auth_url, self.load_db_cb, url)
 
-	def load_db_cb(self, gdaemonfile, result):
+	def load_db_cb(self, result, url):
 		import xml.dom.minidom
 
-		auth_xml = self.auth_stream.read_finish(result).read()
-		self.auth_stream = None
+		if result is None:
+			emsg = _("Error connecting to Ampache Server at %s") % (self.url)
+			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
+			dlg.run()
+			dlg.destroy()
+			return
 
-		dom = xml.dom.minidom.parseString(auth_xml)
+		dom = xml.dom.minidom.parseString(result)
 		self.auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
 
 		print "Auth: %s" % self.auth
@@ -87,18 +90,21 @@ class AmpacheBrowser(rb.BrowserSource):
 		request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (self.url, self.offset, self.limit, self.auth)
 		print "url: %s" % request
 
-		self.songs_stream = gio.File(request)
-		self.songs_stream.read_async(self.populate_cb)
+		rb.Loader().get_url(request, self.populate_cb, request)
 
-	def populate_cb(self, gdaemonfile, result):
+	def populate_cb(self, result, url):
 		import xml.dom.minidom
 
-		songs_xml = self.songs_stream.read_finish(result).read()
-		self.songs_stream = None
+		if result is None:
+			emsg = _("Error downloading song database from Ampache Server at %s") % (self.url)
+			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
+			dlg.run()
+			dlg.destroy()
+			return
 
 		song = 0
 
-		dom = xml.dom.minidom.parseString(songs_xml)
+		dom = xml.dom.minidom.parseString(result)
 		for node in dom.getElementsByTagName("song"):
 			song = song + 1
 
