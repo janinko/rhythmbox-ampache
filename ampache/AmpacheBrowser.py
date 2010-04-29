@@ -84,8 +84,6 @@ class AmpacheBrowser(rb.BrowserSource):
 		self.populate()
 
 	def populate(self):
-		#gtk.gdk.threads_enter()
-
 		print "offset: %s, limit: %s" % (self.offset, self.limit)
 		request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (self.url, self.offset, self.limit, self.auth)
 		print "url: %s" % request
