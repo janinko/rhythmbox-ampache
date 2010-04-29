@@ -187,11 +187,9 @@ class AmpacheBrowser(rb.BrowserSource):
 		self.db.commit()
 
 		if (song < self.limit):
-			#gtk.gdk.threads_leave()
 			return False
 		else:
 			self.offset = self.offset + song
-		#gtk.gdk.threads_leave()
 		self.populate()
 		return True
 
