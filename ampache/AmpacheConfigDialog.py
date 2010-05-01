@@ -14,6 +14,7 @@ class AmpacheConfigDialog(object):
 
 		self.password = self.gladexml.get_widget("password_entry")
 		self.password.set_text(self.config.get("password"))
+		self.password.set_visibility(False)
 
 		self.config_dialog.connect("response", self.dialog_response)
 
