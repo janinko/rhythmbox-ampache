@@ -72,7 +72,7 @@ class AmpacheBrowser(rb.BrowserSource):
 		
 		self.cache_stream  = None
 		
-		self.cache = AmpacheCache('/home/%s/.gnome2/rhythmbox/plugins/ampache/song-cache.xml' % os.getlogin(), True)
+		self.cache = AmpacheCache('/home/%s/.cache/rhythmbox/ampache/song-cache.xml' % os.getlogin(), True)
 		self.db_dates      = None
 		self.update_date   = None
 		self.add_date      = None
