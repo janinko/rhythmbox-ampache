@@ -72,7 +72,8 @@ class AmpacheBrowser(rb.BrowserSource):
 		
 		self.cache_stream  = None
 		
-		self.cache = AmpacheCache('/home/%s/.cache/rhythmbox/ampache/song-cache.xml' % os.getlogin(), True)
+		self.cache_dir = os.path.expanduser("~/.cache/rhythmbox/ampache")
+		self.cache = AmpacheCache('%s/song-cache.xml' % self.cache_dir, True)
 		self.db_dates      = None
 		self.update_date   = None
 		self.add_date      = None
@@ -124,7 +125,6 @@ class AmpacheBrowser(rb.BrowserSource):
 	def load_db(self):
 		import urllib2
 		import time
-		import md5
 		import xml.dom.minidom
 
 		url = self.config.get("url")
@@ -355,6 +355,7 @@ class AmpacheBrowser(rb.BrowserSource):
 		if (song_count < self.limit):
 			if self.cache.enabled == True:
 				# write the xml cache file, so the next time we dont need to download this information
+				os.makedirs(self.cache_dir)
 				self.cache.write()
 				
 	       		return False
