@@ -355,7 +355,8 @@ class AmpacheBrowser(rb.BrowserSource):
 		if (song_count < self.limit):
 			if self.cache.enabled == True:
 				# write the xml cache file, so the next time we dont need to download this information
-				os.makedirs(self.cache_dir)
+				if not os.path.isdir(self.cache_dir):
+					os.makedirs(self.cache_dir)
 				self.cache.write()
 				
 	       		return False
