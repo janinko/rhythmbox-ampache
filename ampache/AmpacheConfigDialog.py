@@ -10,10 +10,11 @@ class AmpacheConfigDialog(object):
 		self.url.set_text(self.config.get("url"))
 
 		self.username = self.gladexml.get_widget("username_entry")
-		self.username.set_text(self.config.get_username())
+		self.username.set_text(self.config.get("username"))
 
 		self.password = self.gladexml.get_widget("password_entry")
-		self.password.set_text(self.config.get_password())
+		self.password.set_text(self.config.get("password"))
+		self.password.set_visibility(False)
 
 		self.config_dialog.connect("response", self.dialog_response)
 
@@ -23,8 +24,8 @@ class AmpacheConfigDialog(object):
 	def dialog_response(self, dialog, response):
 		if response == gtk.RESPONSE_OK:
 			self.config.set("url", self.url.get_text())
-			self.config.set_login_info(self.username.get_text(),
-						   self.password.get_text());
+			self.config.set("username", self.username.get_text())
+			self.config.set("password", self.password.get_text())
 
 			self.config_dialog.hide()
 
