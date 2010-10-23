@@ -20,6 +20,10 @@ ui_str = """
 </ui>
 """
 
+class AmpacheEntryType(rhythmdb.EntryType):
+	def __init__(self):
+		rhythmdb.EntryType.__init__(self, name='AmpacheEntryType')
+
 class Ampache(rb.Plugin):
 	def __init__(self):
 		self.config = AmpacheConfig()
@@ -29,7 +33,7 @@ class Ampache(rb.Plugin):
 	def activate(self, shell):
 		self.db = shell.props.db
 
-		self.entry_type = self.db.entry_register_type("AmpacheEntryType")
+		self.entry_type = AmpacheEntryType()
 		self.entry_type.can_sync_metadata = True
 		self.entry_type.sync_metadata = None
 		self.entry_type.category = rhythmdb.ENTRY_STREAM
