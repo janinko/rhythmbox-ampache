@@ -1,6 +1,6 @@
 Name:		rhythmbox-ampache
 Summary:	Ampache plugin for Rhythmbox
-Version:	0.10
+Version:	0.11
 Release:	1%{?dist}
 License:	GPLv2
 Group:		Applications/Multimedia
@@ -36,5 +36,8 @@ rm -rf %{buildroot}
 %{_libdir}/rhythmbox/plugins/ampache/*
 
 %changelog
+* Sat Oct 23 2010 Massimo Mund <massimo.mund@googlemail.com> 0.11-1
+- Rhythmbox API changes
+
 * Mon Apr 26 2010 Seva Epsteyn <seva@sevatech.com> 0.10-1
 - Initial build
