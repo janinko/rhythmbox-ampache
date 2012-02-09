@@ -1,387 +1,397 @@
-import rb, rhythmdb
+# -*- Mode: python; coding: utf-8; tab-width: 8; indent-tabs-mode: t; -*-
+# vim: expandtab shiftwidth=8 softtabstop=8 tabstop=8
 
-import gobject
-import gtk
-import gio
-import datetime
+from gi.repository import RB
+from gi.repository import GObject, Gtk, Gio, GLib
+
+import time
+from time import mktime
+from datetime import datetime
+import re
 import hashlib
 import os
-
-class AmpacheCache():
-	def __init__(self, cache_file, cache_enabled):
-		import xml.dom.minidom
-		self.file          = cache_file                                  # path to the cache file
-
-		self.xml_document  = xml.dom.minidom.Document()                  # xml root element 
-		self.xml_root      = self.xml_document.createElement('root')
-		self.xml_document.appendChild(self.xml_root)
-
-		self.xml_songs     = self.xml_document.createElement('songs')    # xml songs element
-		self.xml_db_dates  = self.xml_document.createElement('db_dates') # xml db_date element
-
-		self.enabled       = cache_enabled
-
-	def set_db_dates(self, update_date, add_date, clean_date):
-		date = self.xml_document.createElement('update')
-		date.setAttribute('date', str(update_date))
-		self.xml_db_dates.appendChild(date)
-
-		date = self.xml_document.createElement('add')
-		date.setAttribute('date', str(add_date))
-		self.xml_db_dates.appendChild(date)
-
-		date = self.xml_document.createElement('clean')
-		date.setAttribute('date', str(clean_date))
-		self.xml_db_dates.appendChild(date)
-
-       	def add_song(self, song_id, song_url, song_title, song_artist, song_album, song_genre, song_track_number, song_duration):
-		song = self.xml_document.createElement('song')
-		song.setAttribute('id', str(song_id))
-		song.setAttribute('url', str(song_url))
-		song.setAttribute('title', str(song_title))
-		song.setAttribute('artist', str(song_artist))
-		song.setAttribute('album', str(song_album))
-		song.setAttribute('genre', str(song_genre))
-		song.setAttribute('track_number', str(song_track_number))
-		song.setAttribute('duration', str(song_duration))
-		self.xml_songs.appendChild(song)
-
-	def write(self):
-		self.xml_root.appendChild(self.xml_songs)
-		self.xml_root.appendChild(self.xml_db_dates)
-
-		h = open(self.file, 'w')
-		h.writelines(self.xml_document.toprettyxml(indent='  '))
-		h.close()
-
-
-class AmpacheBrowser(rb.BrowserSource):
-	__gproperties__ = {
-		'plugin': (rb.Plugin, 'plugin', 'plugin', gobject.PARAM_WRITABLE|gobject.PARAM_CONSTRUCT_ONLY),
-	}
-
-	def __init__(self):
-        	rb.BrowserSource.__init__(self)
-
-	def activate(self, config):
-		# Plugin activated
-		self.limit         = 100
-		self.offset        = 0
-		self.url           = ''
-		self.auth          = None
-		
-		self.cache_stream  = None
-		
-		self.cache_dir = os.path.expanduser("~/.cache/rhythmbox/ampache")
-		self.cache = AmpacheCache('%s/song-cache.xml' % self.cache_dir, True)
-		self.db_dates      = None
-		self.update_date   = None
-		self.add_date      = None
-		self.clean_date    = None
-
-		self.config = config
-
-		width, height      = gtk.icon_size_lookup(gtk.ICON_SIZE_LARGE_TOOLBAR)
-		icon               = gtk.gdk.pixbuf_new_from_file_at_size(self.config.get("icon_filename"), width, height)
-		self.set_property( "icon",  icon) 
-
-		shell              = self.get_property("shell")
-		self.db            = shell.get_property("db")
-		self.entry_type    = self.get_property("entry-type")
-
-		self.__activate    = False
-
-	# need if we use find_file
-	def do_set_property(self, property, value):
-		if property.name == 'plugin':
-			self.__plugin = value
-		else:
-			raise AttributeError, 'unknown property %s' % property.name
-
-        def do_impl_get_browser_key(self):
-                return "/apps/rhythmbox/plugins/ampache/show_browser"
-
-        def do_impl_get_paned_key(self):
-                return "/apps/rhythmbox/plugins/ampache/paned_position"
-
-	def db_add_entry(self, song_id, song_url, song_title, song_artist, song_album, song_genre, song_track_number, song_duration):
-		# check to see if entry already exists in DB before creating a new one
-		entry = self.db.entry_lookup_by_location(song_url)
-		if entry == None:
-			entry = self.db.entry_new(self.entry_type, song_url)
-
-		if song_id != '':
-			self.db.set(entry, rhythmdb.PROP_TITLE, song_title)
-		if song_artist != '':
-			self.db.set(entry, rhythmdb.PROP_ARTIST, song_artist)
-       		if song_album != '':
-			self.db.set(entry, rhythmdb.PROP_ALBUM, song_album)
-		if song_genre != '':
-			self.db.set(entry, rhythmdb.PROP_GENRE, song_genre)
-
-       		self.db.set(entry, rhythmdb.PROP_TRACK_NUMBER, song_track_number)
-		self.db.set(entry, rhythmdb.PROP_DURATION, song_duration)
-
-	def load_db(self):
-		import urllib2
-		import time
-		import xml.dom.minidom
-
-		url = self.config.get("url")
-		username = self.config.get("username")
-		password = self.config.get("password")
-    
-		if not url:
-			emsg = _("Server URL is missing")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-    
-		if not password:
-			emsg = _("Server password is empty")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		timestamp = int(time.time())
-		password = hashlib.sha256(password).hexdigest()
-		authkey = hashlib.sha256(str(timestamp) + password).hexdigest()
-
-		self.url = url
-
-		auth_xml = urllib2.urlopen("%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username)).read()
-
-		self.cache_stream = gio.File(self.cache.file)
-		self.auth_stream = None
-
-		try:
-			dom = xml.dom.minidom.parseString(auth_xml)
-
-			self.update_date = dom.getElementsByTagName("update")[0].childNodes[0].data
-			self.add_date = dom.getElementsByTagName("add")[0].childNodes[0].data
-			self.clean_date = dom.getElementsByTagName("clean")[0].childNodes[0].data
-		except:
-			emsg = _("Failed to authenticate with server")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-                # print "self: update_date=%s. add_date=%s, clean_date=%s\n" % (self.update_date, self.add_date, self.clean_date)
-		self.cache_stream.read_async(self.load_db_cb)
-    
-       	def load_db_cb(self, gdaemonfile, result):
-		import xml.dom.minidom
-    
-		xmldata = self.cache_stream.read_finish(result).read()
-		dom = xml.dom.minidom.parseString(xmldata)
-		self.cache_stream = None
-
-		# check library modification dates to decide whether we can use the cache
-		db_dates    = dom.getElementsByTagName('db_dates')[0]
-		update_date = db_dates.getElementsByTagName('update')[0].getAttribute('date')
-		add_date    = db_dates.getElementsByTagName('add')[0].getAttribute('date')
-		clean_date  = db_dates.getElementsByTagName('clean')[0].getAttribute('date')
-
-		#    print "update_date=%s. add_date=%s, clean_date=%s\n" % (update_date, add_date, clean_date)
-		#    print "self: update_date=%s. add_date=%s, clean_date=%s\n" % (self.update_date, self.add_date, self.clean_date)
-
-		if (update_date != self.update_date) or (add_date != self.add_date) or (clean_date != self.clean_date):
-			print "dates DID NOT match so downloading db"
-			self.download_db()
-		else:
-			print "dates DID match so loading cached db"
-			for song in dom.getElementsByTagName('song'):
-				song_id           = song.getAttribute('id')
-				song_url          = song.getAttribute('url')
-				song_title        = song.getAttribute('title')
-				song_artist       = song.getAttribute('artist')
-				song_album        = song.getAttribute('album')
-				song_genre        = song.getAttribute('genre')
-				song_track_number = int(song.getAttribute('track_number'))
-				song_duration     = int(song.getAttribute('duration'))
-				self.db_add_entry(song_id, song_url, song_title, song_artist, song_album, song_genre, song_track_number, song_duration)
-		
-			self.db.commit()
-
-       	def download_db(self):
-		import time
-
-		url = self.config.get("url")
-
-		username = self.config.get("username") # necessary ?
-		password = self.config.get("password")
-
-		if not url:
-			emsg = _("Server URL is missing")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		if not password:
-			emsg = _("Server password is empty")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		timestamp = int(time.time())
-		password  = hashlib.sha256(password).hexdigest()
-		authkey   = hashlib.sha256(str(timestamp) + password).hexdigest()
-
-		print "url=%s, authkey=%s, timestamp=%s, username=%s" % (url, authkey, timestamp, username)
-
-		auth_url = "%s?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001" % (url, authkey, timestamp, username)
-		self.url = url
-		rb.Loader().get_url(auth_url, self.download_db_cb)
-
-	def download_db_cb(self, result):
-		import xml.dom.minidom
-
-		if result is None:
-			emsg = _("Error connecting to Ampache Server at %s") % (self.url)
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		try:
-			dom = xml.dom.minidom.parseString(result)
-			self.auth = dom.getElementsByTagName("auth")[0].childNodes[0].data
-			self.update_date = dom.getElementsByTagName("update")[0].childNodes[0].data
-			self.add_date = dom.getElementsByTagName("add")[0].childNodes[0].data
-			self.clean_date = dom.getElementsByTagName("clean")[0].childNodes[0].data
-		except:
-			emsg = _("Could not authenticate username/password")
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		self.populate()
-
-		self.cache.set_db_dates(self.update_date, self.add_date, self.clean_date)
-
-	def populate(self):
-		import xml.dom.minidom
-
-		print "offset: %s, limit: %s" % (self.offset, self.limit)
-		request = "%s?offset=%s&limit=%s&action=songs&auth=%s" % (self.url, self.offset, self.limit, self.auth)
-		print "url: %s" % request
-
-		rb.Loader().get_url(request, self.populate_cb, request)
-
-	def populate_cb(self, result, url):
-		import xml.dom.minidom
-
-		if result is None:
-			emsg = _("Error downloading song database from Ampache Server at %s") % (self.url)
-			dlg = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK, emsg)
-			dlg.run()
-			dlg.destroy()
-			return
-
-		song_count = 0
-		dom = xml.dom.minidom.parseString(result)
-		for node in dom.getElementsByTagName("song"):
-			song_count = song_count + 1
-			song_id    = node.getAttribute("id")
-
-			tmp = node.getElementsByTagName("url")
-			if tmp == []:
-				song_url = '' #node.getElementsByTagName("genre")[0].childNodes[0].data
-			else:
-				if tmp[0].childNodes == []:
-					song_url = '';
-				else:
-					song_url = tmp[0].childNodes[0].data
-        
-		       	tmp = node.getElementsByTagName("title")
-			if tmp == []:
-				song_title = '' #node.getElementsByTagName("genre")[0].childNodes[0].data
-			else:
-				if tmp[0].childNodes == []:
-					song_title = '';
-				else:
-					song_title = tmp[0].childNodes[0].data
-                        #print "title: %s" % e_title
-
-		       	tmp = node.getElementsByTagName("artist")
-			if tmp == []:
-				song_artist = '' #node.getElementsByTagName("genre")[0].childNodes[0].data
-			else:
-				if tmp[0].childNodes == []:
-					song_artist = '';
-				else:
-					song_artist = tmp[0].childNodes[0].data
-                        #print "artist: %s" % e_artist
-        
-			tmp = node.getElementsByTagName("album")
-			if tmp == []:
-				song_album = '' #node.getElementsByTagName("genre")[0].childNodes[0].data
-			else:
-				if tmp[0].childNodes == []:
-					song_album = '';
-				else:
-					song_album = tmp[0].childNodes[0].data
-                        #print "album: %s" % e_album
-
-			tmp = node.getElementsByTagName("tag")
-			if tmp == []:
-				song_genre = '' #node.getElementsByTagName("genre")[0].childNodes[0].data
-			else:
-				if tmp[0].childNodes == []:
-					song_genre = '';
-				else:
-					song_genre = tmp[0].childNodes[0].data
-                        #print "genre: %s" % e_genre
-
-			song_track_number = int(node.getElementsByTagName("track")[0].childNodes[0].data)
-			song_duration     = int(node.getElementsByTagName("time")[0].childNodes[0].data)
-
-                        #print "Processing %s - %s" % (artist, album) #DEBUG
-
-                        # adding the song to our database
-			self.db_add_entry(song_id, song_url, song_title, song_artist, song_album, song_genre, song_track_number, song_duration)
-
-			if self.cache.enabled == True:
-				# create an entry for the cache file
-				self.cache.add_song(song_id, song_url, song_title, song_artist, song_album, song_genre, song_track_number, song_duration)
-				
-		self.db.commit()
-		if (song_count < self.limit):
-			if self.cache.enabled == True:
-				# write the xml cache file, so the next time we dont need to download this information
-				if not os.path.isdir(self.cache_dir):
-					os.makedirs(self.cache_dir)
-				self.cache.write()
-				
-	       		return False
-		else:
-			self.offset = self.offset + song_count
-
-	       	self.populate()
-		return True
-
-	# Source is first clicked on
-	def do_impl_activate (self):
-		# Connect to Ampache if not already
-		if not self.__activate:
-			self.__activate = True
-			if self.cache.enabled == True:
-				if not os.path.exists(self.cache.file):
-					print "no cache file exists so downloading db"
-					self.download_db()
-				else:
-					print "cache file does exist so attempting to load cached db"
-					self.load_db()
-			else:
-				print "caching disabled so downloading db"
-				self.download_db()
-				
-		rb.BrowserSource.do_impl_activate(self)
-		
-gobject.type_register(AmpacheBrowser)
+import os.path
+import sys
+
+import xml.sax, xml.sax.handler
+
+class HandshakeHandler(xml.sax.handler.ContentHandler):
+      def __init__(self, handshake):
+            xml.sax.handler.ContentHandler.__init__(self)
+            self.__handshake = handshake
+
+      def startElement(self, name, attrs):
+            self.__text = ''
+
+      def endElement(self, name):
+            self.__handshake[name] = self.__text
+
+      def characters(self, content):
+            self.__text = self.__text + content
+
+class SongsHandler(xml.sax.handler.ContentHandler):
+        def __init__(self, db, entry_type, albumart):
+                xml.sax.handler.ContentHandler.__init__(self)
+                self.__db = db
+                self.__entry_type = entry_type
+                self.__albumart = albumart
+                self.__clear()
+
+        def startElement(self, name, attrs):
+                if name == 'song':
+                        self.__id = attrs['id']
+                self.__text = ''
+
+        def endElement(self, name):
+                if name == 'song':
+                        try:
+                                # add the track to the source if it doesn't exist
+                                entry = self.__db.entry_lookup_by_location(str(self.__url))
+                                if entry == None:
+                                        entry = RB.RhythmDBEntry.new(self.__db, self.__entry_type, str(self.__url))
+
+                                if self.__artist != '':
+                                        self.__db.entry_set(entry, RB.RhythmDBPropType.ARTIST, str(self.__artist))
+                                if self.__album != '':
+                                        self.__db.entry_set(entry, RB.RhythmDBPropType.ALBUM, str(self.__album))
+                                if self.__title != '':
+                                        self.__db.entry_set(entry, RB.RhythmDBPropType.TITLE, str(self.__title))
+                                if self.__tag != '':
+                                        self.__db.entry_set(entry, RB.RhythmDBPropType.GENRE, str(self.__tag))
+                                self.__db.entry_set(entry, RB.RhythmDBPropType.TRACK_NUMBER, self.__track)
+                                self.__db.entry_set(entry, RB.RhythmDBPropType.DURATION, self.__time)
+                                self.__db.entry_set(entry, RB.RhythmDBPropType.FILE_SIZE, self.__size)
+                                self.__db.entry_set(entry, RB.RhythmDBPropType.RATING, self.__rating)
+                                self.__db.commit()
+
+                                self.__albumart[str(self.__artist) + str(self.__album)] = str(self.__art)
+
+                        except Exception,e: # This happens on duplicate uris being added
+                                sys.excepthook(*sys.exc_info())
+                                print("Couldn't add %s - %s" % (self.__artist, self.__title), e)
+
+                        self.__clear()
+
+                elif name == 'url':
+                        self.__url = self.__text
+                elif name == 'artist':
+                        self.__artist = self.__text.encode('utf-8')
+                elif name == 'album':
+                        self.__album = self.__text.encode('utf-8')
+                elif name == 'title':
+                        self.__title = self.__text.encode('utf-8')
+                elif name == 'tag':
+                        self.__tag = self.__text
+                elif name == 'track':
+                        self.__track = int(self.__text)
+                elif name == 'time':
+                        self.__time = int(self.__text)
+                elif name == 'size':
+                        self.__size = int(self.__text)
+                elif name == 'rating':
+                        self.__rating = int(self.__text)
+                elif name == 'art':
+                        self.__art = self.__text
+                else:
+                        self.__null = self.__text
+
+        def characters(self, content):
+                self.__text = self.__text + content
+
+        def __clear(self):
+                self.__id = 0
+                self.__url = ''
+                self.__artist = ''
+                self.__album = ''
+                self.__title = ''
+                self.__tag = ''
+                self.__track = ''
+                self.__time = 0
+                self.__size = 0
+                self.__rating = 0
+                self.__art = ''
+
+class AmpacheBrowser(RB.BrowserSource):
+
+        def __init__(self):
+                RB.BrowserSource.__init__(self, name=_("Ampache"))
+
+                self.__limit = 5000
+
+                self.__cache_filename = os.path.join(RB.user_cache_dir(), 'ampache', 'song_cache.xml')
+                self.settings = Gio.Settings('org.gnome.rhythmbox.plugins.ampache')
+                self.__albumart = {}
+
+                self.__text = None
+                self.__progress_text = None
+                self.__progress = 1
+
+                self.__activate = False
+
+        def do_show_popup(self):
+                if self.__activate:
+                        self.__popup.popup(None, None, None, None, 3, Gtk.get_current_event_time())
+
+        def download_catalog(self):
+
+                def cache_saved_cb(stream, result, data):
+                        try:
+                                size = stream.write_finish(result)
+                        except Exception, e:
+                                print("error writing file: %s" % (self.__cache_filename))
+                                sys.excepthook(*sys.exc_info())
+
+                        # close stream
+                        stream.close(Gio.Cancellable())
+
+                        # change modification time to update time
+                        update_time = int(mktime(self.__handshake_update.timetuple()))
+                        os.utime(self.__cache_filename, (update_time, update_time))
+                def open_append_cb(file, result, data):
+                        try:
+                                stream = file.append_to_finish(result)
+                        except Exception, e:
+                                print("error opening file for writing %s" % (self.__cache_filename))
+                                sys.excepthook(*sys.exc_info())
+
+                        stream.write_async(
+                                data.encode('utf-8'),
+                                GLib.PRIORITY_DEFAULT,
+                                Gio.Cancellable(),
+                                cache_saved_cb,
+                                None)
+                        print("write to cache file: %s" % (self.__cache_filename))
+
+                def songs_downloaded_cb(file, result, data):
+                        try:
+                                (ok, contents, etag) = file.load_contents_finish(result)
+                        except Exception, e:
+                                emsg = _('Catalog response: %s') % e
+                                edlg = Gtk.MessageDialog(None, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.OK, emsg)
+                                edlg.run()
+                                edlg.destroy()
+                                self.__activate = False
+                                return
+
+                        offset = data[0] + self.__limit
+
+                        self.__progress = float(offset) / float(self.__handshake_songs)
+                        self.notify_status_changed()
+
+                        if offset < self.__handshake_songs:
+                                # download subsequent chunk of songs
+                                download_songs_chunk(offset, data[1], data[2])
+                        else:
+                                self.__text = ''
+                                self.__progress = 1
+                                self.notify_status_changed()
+
+                        try:
+                                data[1].feed(contents)
+                                data[1].reset()
+                        except xml.sax.SAXParseException, e:
+                                print("error parsing songs: %s" % e)
+
+                        # remove enveloping <?xml> and <root> tags
+                        # as needed to regenerate one full .xml
+                        lines = contents.decode('utf-8').splitlines(True)
+                        if data[0] > 0:
+                                del lines[:2]
+                        if offset < self.__handshake_songs:
+                                del lines[-2:]
+
+                        contents = ''.join(lines)
+
+                        data[2].append_to_async(
+                                Gio.FileCreateFlags.NONE,
+                                GLib.PRIORITY_DEFAULT,
+                                Gio.Cancellable(),
+                                open_append_cb,
+                                contents)
+                        print("append to cache file: %s" % (self.__cache_filename))
+
+                def download_songs_chunk(offset, parser, cache_file):
+                        ampache_server_uri = '%s/server/xml.server.php?action=songs&auth=%s&offset=%s&limit=%s' % (self.settings['url'], self.__handshake_auth, offset, self.__limit)
+                        ampache_server_file = Gio.file_new_for_uri(ampache_server_uri)
+                        ampache_server_file.load_contents_async(
+                                Gio.Cancellable(),
+                                songs_downloaded_cb,
+                                (offset, parser, cache_file))
+                        print("downloading songs: %s" % (ampache_server_uri))
+
+                self.__text = 'Download songs from Ampache server...'
+                self.notify_status_changed()
+
+                # instantiate songs parser
+                parser = xml.sax.make_parser()
+                parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart))
+
+                cache_file = Gio.file_new_for_path(self.__cache_filename)
+
+                # delete cache file if available
+                try:
+                        cache_file.delete(Gio.Cancellable())
+                except Exception, e:
+                        pass
+
+                # delete all ampache songs from database
+                self.__db.entry_delete_by_type(self.__entry_type)
+
+                # download first chunk of songs
+                download_songs_chunk(0, parser, cache_file)
+
+        def update_catalog(self):
+
+                def handshake_cb(file, result, parser):
+                        try:
+                                (ok, contents, etag) = file.load_contents_finish(result)
+                        except Exception, e:
+                                emsg = _('Handshake response: %s') % e
+                                edlg = Gtk.MessageDialog(None, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.OK, emsg)
+                                edlg.run()
+                                edlg.destroy()
+                                self.__activate = False
+                                return
+
+                        try:
+                                parser.feed(contents)
+                        except xml.sax.SAXParseException, e:
+                                print("error parsing handshake: %s" % e)
+
+                        # convert handshake update time into datetime
+                        self.__handshake_update = datetime.strptime(handshake['update'][0:18], '%Y-%m-%dT%H:%M:%S')
+                        self.__handshake_auth = handshake['auth']
+                        self.__handshake_songs = int(handshake['songs'])
+
+                        # cache file mtime >= handshake update time: load cached
+                        if os.path.exists(self.__cache_filename) and datetime.fromtimestamp(os.path.getmtime(self.__cache_filename)) >= self.__handshake_update:
+                                load_catalog()
+                        else:
+                                self.download_catalog()
+
+                # check for errors
+                if not self.settings['url']:
+                        edlg = Gtk.MessageDialog(None, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.OK, _('URL missing'))
+                        edlg.run()
+                        edlg.destroy()
+                        self.__activate = False
+                        return
+
+                if not self.settings['password']:
+                        edlg = Gtk.MessageDialog(None, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.OK, _('Password missing'))
+                        edlg.run()
+                        edlg.destroy()
+                        self.__activate = False
+                        return
+
+                self.__text = 'Update songs...'
+                self.__progress = 0
+                self.notify_status_changed()
+
+                handshake = {}
+
+                # instantiate handshake parser
+                parser = xml.sax.make_parser()
+                parser.setContentHandler(HandshakeHandler(handshake))
+
+                # build handshake url
+                timestamp = int(time.time())
+                password = hashlib.sha256(self.settings['password']).hexdigest()
+                authkey = hashlib.sha256(str(timestamp) + password).hexdigest()
+
+                # execute handshake
+                ampache_server_uri = '%s/server/xml.server.php?action=handshake&auth=%s&timestamp=%s&user=%s&version=350001' % (self.settings['url'], authkey, timestamp, self.settings['username'])
+                ampache_server_file = Gio.file_new_for_uri(ampache_server_uri)
+                ampache_server_file.load_contents_async(
+                        Gio.Cancellable(),
+                        handshake_cb,
+                        parser)
+                print("downloading handshake: %s" % (ampache_server_uri))
+
+                def load_catalog():
+                        def songs_loaded_cb(file, result, parser):
+                                try:
+                                        (ok, contents, etag) = file.load_contents_finish(result)
+                                except Exception, e:
+                                        RB.error_dialog(
+                                                title=_("Unable to load catalog"),
+                                                message=_("Rhythmbox could not load the Ampache catalog."))
+                                        return
+
+                                try:
+                                        parser.feed(contents)
+                                except xml.sax.SAXParseException, e:
+                                        print("error parsing songs: %s" % e)
+
+                                self.__text = ''
+                                self.__progress = 1
+                                self.notify_status_changed()
+
+                        self.__text = 'Load songs from cache...'
+                        self.notify_status_changed()
+
+                        # instantiate songs parser
+                        parser = xml.sax.make_parser()
+                        parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart))
+
+                        cache_file = Gio.file_new_for_path(self.__cache_filename)
+                        cache_file.load_contents_async(
+                                Gio.Cancellable(),
+                                songs_loaded_cb,
+                                parser)
+
+        # Source is activated
+        def do_activate(self):
+
+                # activate source if inactive
+                if not self.__activate:
+                        self.__activate = True
+
+                        shell = self.props.shell
+
+                        # get db
+                        self.__db = shell.props.db
+                        self.__entry_type = self.props.entry_type
+
+                        # connect playing-song-changed signal
+                        self.__art_store = RB.ExtDB(name="album-art")
+                        self.__art_request = self.__art_store.connect("request", self.__album_art_requested)
+
+                        # get popup menu
+                        self.__popup = shell.props.ui_manager.get_widget('/AmpacheSourceViewPopup')
+
+                        # create cache directory if it doesn't exist
+                        cache_path = os.path.dirname(self.__cache_filename)
+                        if not os.path.exists(cache_path):
+                                os.mkdir(cache_path, 0700)
+
+                        self.update_catalog()
+
+        # Source is activated
+        def do_deactivate(self):
+
+                # deactivate source if active
+                if self.__activate:
+                        self.__activate = False
+
+                        self.__art_store.disconnect(self.__art_request)
+                        self.__art_store = None
+
+                        shell.props.ui_manager.remove_ui(self.__popup)
+
+                        self.object = None
+
+        def __album_art_requested(self, store, key, last_time):
+                artist = key.get_field('artist')
+                album = key.get_field('album')
+                uri = self.__albumart[artist + album]
+                print('album art uri: %s' % uri)
+                if uri:
+                        storekey = RB.ExtDBKey.create_storage('album', album)
+                        storekey.add_field('artist', artist)
+                        store.store_uri(storekey, RB.ExtDBSourceType.SEARCH, uri)
+
+        def do_get_status(self, status, progress_text, progress):
+                return (self.__text, self.__progress_text, self.__progress)
+
+GObject.type_register(AmpacheBrowser)

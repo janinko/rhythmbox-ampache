@@ -1,7 +1,8 @@
-[RB Plugin]
+[Plugin]
 Loader=python
 Module=ampache
-IAge=1
+IAge=2
+Depends=rb
 Name=Ampache Library
 Description=Adds support for playing music from an Ampache instance
 Authors=Rhythmbox Ampache plugin team <rhythmbox-ampache@googlegroups.com>

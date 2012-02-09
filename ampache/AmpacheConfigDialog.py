@@ -1,37 +1,38 @@
-import gtk, gtk.glade
+import rb
+from gi.repository import GObject, Gtk, Gio, PeasGtk
 
-class AmpacheConfigDialog(object):
-	def __init__(self, glade_file, config):
-		self.gladexml = gtk.glade.XML(glade_file)
-		self.config = config
-		self.config_dialog = self.gladexml.get_widget("preferences_dialog")
+class AmpacheConfigDialog(GObject.Object, PeasGtk.Configurable):
+        __gtype_name__ = 'AmpacheConfigDialog'
+        object = GObject.property(type=GObject.Object)
 
-		self.url = self.gladexml.get_widget("url_entry")
-		self.url.set_text(self.config.get("url"))
+	def do_create_configure_widget(self):
 
-		self.username = self.gladexml.get_widget("username_entry")
-		self.username.set_text(self.config.get("username"))
+                self.settings = Gio.Settings('org.gnome.rhythmbox.plugins.ampache')
+		self.ui = Gtk.Builder()
+                self.ui.add_from_file(rb.find_plugin_file(self, 'ampache-prefs.ui'))
+		self.config_dialog = self.ui.get_object('config')
 
-		self.password = self.gladexml.get_widget("password_entry")
-		self.password.set_text(self.config.get("password"))
+		self.url = self.ui.get_object("url_entry")
+		self.url.set_text(self.settings['url'])
+
+		self.username = self.ui.get_object("username_entry")
+		self.username.set_text(self.settings['username'])
+
+		self.password = self.ui.get_object("password_entry")
 		self.password.set_visibility(False)
+		self.password.set_text(self.settings['password'])
 
-		self.config_dialog.connect("response", self.dialog_response)
+                self.url.connect('changed', self.url_changed_cb)
+                self.username.connect('changed', self.username_changed_cb)
+                self.password.connect('changed', self.password_changed_cb)
 
-	def get_dialog(self):
-		return self.config_dialog
+                return self.config_dialog
 
-	def dialog_response(self, dialog, response):
-		if response == gtk.RESPONSE_OK:
-			self.config.set("url", self.url.get_text())
-			self.config.set("username", self.username.get_text())
-			self.config.set("password", self.password.get_text())
+	def url_changed_cb(self, widget):
+                self.settings['url'] = self.url.get_text()
 
-			self.config_dialog.hide()
+	def username_changed_cb(self, widget):
+                self.settings['username'] = self.username.get_text()
 
-		elif response == gtk.RESPONSE_CANCEL or response == gtk.RESPONSE_DELETE_EVENT:
-			self.config_dialog.hide()
-
-		else:
-			print "unexpected response type in dialog_response"
-			self.config_dialog.hide()
+	def password_changed_cb(self, widget):
+                self.settings['password'] = self.password.get_text()
