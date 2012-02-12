@@ -21,8 +21,8 @@ setup(name="rhythmbox-ampache",
       author_email="rhythmbox-ampache@googlegroups.com",
       url="http://code.google.com/p/rhythmbox-ampache",
       data_files=[
-          ("lib/rhythmbox/plugins", ["ampache.plugin", "ampache.py", "AmpacheBrowser.py", "AmpacheConfigDialog.py"]),
-          ("share/rhythmbox/plugins", ["ampache-prefs.ui", "ampache.ico", "ampache.png"]),
+          ("lib/rhythmbox/plugins/ampache", ["ampache.plugin", "ampache.py", "AmpacheBrowser.py", "AmpacheConfigDialog.py"]),
+          ("share/rhythmbox/plugins/ampache", ["ampache-prefs.ui", "ampache.ico", "ampache.png"]),
           ("share/glib-2.0/schemas", ["org.gnome.rhythmbox.plugins.ampache.gschema.xml"]),
           ],
       )
