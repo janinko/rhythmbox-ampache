@@ -1,6 +1,12 @@
 # -*- Mode: python; coding: utf-8; tab-width: 8; indent-tabs-mode: t; -*-
 # vim: expandtab shiftwidth=8 softtabstop=8 tabstop=8
 
+# todo:
+# - file append via write_async() results in garbage at the beginning of
+#   the data, temporary workaround: use python file I/O
+# - refetch of song data will result in entry->refcount > 0 assertion
+#   and Segmentation Fault
+
 from gi.repository import RB
 from gi.repository import GObject, Gtk, Gio, GLib
 
@@ -16,18 +22,18 @@ import sys
 import xml.sax, xml.sax.handler
 
 class HandshakeHandler(xml.sax.handler.ContentHandler):
-      def __init__(self, handshake):
-            xml.sax.handler.ContentHandler.__init__(self)
-            self.__handshake = handshake
+        def __init__(self, handshake):
+                xml.sax.handler.ContentHandler.__init__(self)
+                self.__handshake = handshake
 
-      def startElement(self, name, attrs):
-            self.__text = ''
+        def startElement(self, name, attrs):
+                self.__text = ''
 
-      def endElement(self, name):
-            self.__handshake[name] = self.__text
+        def endElement(self, name):
+                self.__handshake[name] = self.__text
 
-      def characters(self, content):
-            self.__text = self.__text + content
+        def characters(self, content):
+                self.__text = self.__text + content
 
 class SongsHandler(xml.sax.handler.ContentHandler):
         def __init__(self, db, entry_type, albumart):
@@ -134,33 +140,33 @@ class AmpacheBrowser(RB.BrowserSource):
 
         def download_catalog(self):
 
-                def cache_saved_cb(stream, result, data):
-                        try:
-                                size = stream.write_finish(result)
-                        except Exception, e:
-                                print("error writing file: %s" % (self.__cache_filename))
-                                sys.excepthook(*sys.exc_info())
-
-                        # close stream
-                        stream.close(Gio.Cancellable())
-
-                        # change modification time to update time
-                        update_time = int(mktime(self.__handshake_update.timetuple()))
-                        os.utime(self.__cache_filename, (update_time, update_time))
-                def open_append_cb(file, result, data):
-                        try:
-                                stream = file.append_to_finish(result)
-                        except Exception, e:
-                                print("error opening file for writing %s" % (self.__cache_filename))
-                                sys.excepthook(*sys.exc_info())
-
-                        stream.write_async(
-                                data.encode('utf-8'),
-                                GLib.PRIORITY_DEFAULT,
-                                Gio.Cancellable(),
-                                cache_saved_cb,
-                                None)
-                        print("write to cache file: %s" % (self.__cache_filename))
+#                def cache_saved_cb(stream, result, data):
+#                        try:
+#                                size = stream.write_finish(result)
+#                        except Exception, e:
+#                                print("error writing file: %s" % (self.__cache_filename))
+#                                sys.excepthook(*sys.exc_info())
+#
+#                        # close stream
+#                        stream.close(Gio.Cancellable())
+#
+#                        # change modification time to update time
+#                        update_time = int(mktime(self.__handshake_update.timetuple()))
+#                        os.utime(self.__cache_filename, (update_time, update_time))
+#                def open_append_cb(file, result, data):
+#                        try:
+#                                stream = file.append_to_finish(result)
+#                        except Exception, e:
+#                                print("error opening file for writing %s" % (self.__cache_filename))
+#                                sys.excepthook(*sys.exc_info())
+#
+#                        stream.write_async(
+#                                data.encode('utf-8'),
+#                                GLib.PRIORITY_DEFAULT,
+#                                Gio.Cancellable(),
+#                                cache_saved_cb,
+#                                None)
+#                        print("write to cache file: %s" % (self.__cache_filename))
 
                 def songs_downloaded_cb(file, result, data):
                         try:
@@ -202,14 +208,21 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         contents = ''.join(lines)
 
-                        data[2].append_to_async(
-                                Gio.FileCreateFlags.NONE,
-                                GLib.PRIORITY_DEFAULT,
-                                Gio.Cancellable(),
-                                open_append_cb,
-                                contents)
+#                        data[2].append_to_async(
+#                                Gio.FileCreateFlags.NONE,
+#                                GLib.PRIORITY_DEFAULT,
+#                                Gio.Cancellable(),
+#                                open_append_cb,
+#                                contents)
+                        data[2].writelines(contents.encode('utf-8'))
                         print("append to cache file: %s" % (self.__cache_filename))
+                        if offset >= self.__handshake_songs:
+                                data[2].close()
 
+                                # change modification time to update time
+                                update_time = int(mktime(self.__handshake_update.timetuple()))
+                                os.utime(self.__cache_filename, (update_time, update_time))
+#
                 def download_songs_chunk(offset, parser, cache_file):
                         ampache_server_uri = '%s/server/xml.server.php?action=songs&auth=%s&offset=%s&limit=%s' % (self.settings['url'], self.__handshake_auth, offset, self.__limit)
                         ampache_server_file = Gio.file_new_for_uri(ampache_server_uri)
@@ -220,19 +233,21 @@ class AmpacheBrowser(RB.BrowserSource):
                         print("downloading songs: %s" % (ampache_server_uri))
 
                 self.__text = 'Download songs from Ampache server...'
+                self.__progress = 0
                 self.notify_status_changed()
 
                 # instantiate songs parser
                 parser = xml.sax.make_parser()
                 parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart))
 
-                cache_file = Gio.file_new_for_path(self.__cache_filename)
+#                cache_file = Gio.file_new_for_path(self.__cache_filename)
+                cache_file = open(self.__cache_filename, "w")
 
                 # delete cache file if available
-                try:
-                        cache_file.delete(Gio.Cancellable())
-                except Exception, e:
-                        pass
+#                try:
+#                        cache_file.delete(Gio.Cancellable())
+#                except Exception, e:
+#                        pass
 
                 # delete all ampache songs from database
                 self.__db.entry_delete_by_type(self.__entry_type)
@@ -285,7 +300,6 @@ class AmpacheBrowser(RB.BrowserSource):
                         return
 
                 self.__text = 'Update songs...'
-                self.__progress = 0
                 self.notify_status_changed()
 
                 handshake = {}
@@ -328,6 +342,7 @@ class AmpacheBrowser(RB.BrowserSource):
                                 self.notify_status_changed()
 
                         self.__text = 'Load songs from cache...'
+                        self.__progress = 0
                         self.notify_status_changed()
 
                         # instantiate songs parser
@@ -367,7 +382,7 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         self.update_catalog()
 
-        # Source is activated
+        # Source is deactivated
         def do_deactivate(self):
 
                 # deactivate source if active
