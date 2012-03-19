@@ -36,12 +36,14 @@ class HandshakeHandler(xml.sax.handler.ContentHandler):
                 self.__text = self.__text + content
 
 class SongsHandler(xml.sax.handler.ContentHandler):
-        def __init__(self, db, entry_type, albumart):
+        def __init__(self, db, entry_type, albumart, auth):
                 xml.sax.handler.ContentHandler.__init__(self)
                 self.__db = db
                 self.__entry_type = entry_type
                 self.__albumart = albumart
+                self.__auth = auth
                 self.__clear()
+                self.__re_auth = re.compile('\\b(?:auth|ssid)=[a-fA-F0-9]*')
 
         def startElement(self, name, attrs):
                 if name == 'song':
@@ -79,6 +81,8 @@ class SongsHandler(xml.sax.handler.ContentHandler):
                         self.__clear()
 
                 elif name == 'url':
+                        if self.__auth: # replace ssid string with new auth string
+                                self.__text = re.sub(self.__re_auth, 'ssid='+self.__auth, self.__text);
                         self.__url = self.__text
                 elif name == 'artist':
                         self.__artist = self.__text.encode('utf-8')
@@ -97,6 +101,8 @@ class SongsHandler(xml.sax.handler.ContentHandler):
                 elif name == 'rating':
                         self.__rating = int(self.__text)
                 elif name == 'art':
+                        if self.__auth: # replace auth string with new auth string
+                                self.__text = re.sub(self.__re_auth, 'auth='+self.__auth, self.__text);
                         self.__art = self.__text
                 else:
                         self.__null = self.__text
@@ -238,7 +244,7 @@ class AmpacheBrowser(RB.BrowserSource):
 
                 # instantiate songs parser
                 parser = xml.sax.make_parser()
-                parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart))
+                parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart, None))
 
 #                cache_file = Gio.file_new_for_path(self.__cache_filename)
                 cache_file = open(self.__cache_filename, "w")
@@ -347,7 +353,7 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         # instantiate songs parser
                         parser = xml.sax.make_parser()
-                        parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart))
+                        parser.setContentHandler(SongsHandler(self.__db, self.__entry_type, self.__albumart, self.__handshake_auth))
 
                         cache_file = Gio.file_new_for_path(self.__cache_filename)
                         cache_file.load_contents_async(
