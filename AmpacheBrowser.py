@@ -67,6 +67,7 @@ class SongsHandler(xml.sax.handler.ContentHandler):
                                 if self.__tag != '':
                                         self.__db.entry_set(entry, RB.RhythmDBPropType.GENRE, str(self.__tag))
                                 self.__db.entry_set(entry, RB.RhythmDBPropType.TRACK_NUMBER, self.__track)
+                                self.__db.entry_set(entry, RB.RhythmDBPropType.DATE, self.__year)
                                 self.__db.entry_set(entry, RB.RhythmDBPropType.DURATION, self.__time)
                                 self.__db.entry_set(entry, RB.RhythmDBPropType.FILE_SIZE, self.__size)
                                 self.__db.entry_set(entry, RB.RhythmDBPropType.RATING, self.__rating)
@@ -94,6 +95,9 @@ class SongsHandler(xml.sax.handler.ContentHandler):
                         self.__tag = self.__text
                 elif name == 'track':
                         self.__track = int(self.__text)
+                elif name == 'year':
+                        if (GLib.Date.valid_year(int(self.__text))):
+                                self.__year = GLib.Date.new_dmy(1, 1, int(self.__text)).get_julian()
                 elif name == 'time':
                         self.__time = int(self.__text)
                 elif name == 'size':
@@ -118,6 +122,7 @@ class SongsHandler(xml.sax.handler.ContentHandler):
                 self.__title = ''
                 self.__tag = ''
                 self.__track = ''
+                self.__year = 0
                 self.__time = 0
                 self.__size = 0
                 self.__rating = 0
@@ -401,6 +406,10 @@ class AmpacheBrowser(RB.BrowserSource):
                         shell.props.ui_manager.remove_ui(self.__popup)
 
                         self.object = None
+                        
+        # Shortcut for single click
+        def do_selected(self):
+                self.do_activate()
 
         def __album_art_requested(self, store, key, last_time):
                 artist = key.get_field('artist')
