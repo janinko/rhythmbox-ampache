@@ -279,6 +279,16 @@ class AmpacheBrowser(RB.BrowserSource):
                                 self.__activate = False
                                 return
 
+                        if len(contents) <= 0:
+                            edlg = Gtk.MessageDialog(None, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.OK, _("Handshake response size: 0\nCheck ampache server logs for cause."))
+                            edlg.run()
+                            edlg.destroy()
+                            self.__activate = False
+
+                            self.__text = ''
+                            self.notify_status_changed()
+                            return
+
                         try:
                                 parser.feed(contents)
                         except xml.sax.SAXParseException, e:
