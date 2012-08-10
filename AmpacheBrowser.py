@@ -230,9 +230,9 @@ class AmpacheBrowser(RB.BrowserSource):
                         if offset >= self.__handshake_songs:
                                 data[2].close()
 
-                                # change modification time to update time
-                                update_time = int(mktime(self.__handshake_update.timetuple()))
-                                os.utime(self.__cache_filename, (update_time, update_time))
+                                # change modification time to newest time
+                                newest_time = int(mktime(self.__handshake_newest.timetuple()))
+                                os.utime(self.__cache_filename, (newest_time, newest_time))
 #
                 def download_songs_chunk(offset, parser, cache_file):
                         ampache_server_uri = '%s/server/xml.server.php?action=songs&auth=%s&offset=%s&limit=%s' % (self.settings['url'], self.__handshake_auth, offset, self.__limit)
@@ -296,11 +296,19 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         # convert handshake update time into datetime
                         self.__handshake_update = datetime.strptime(handshake['update'][0:18], '%Y-%m-%dT%H:%M:%S')
+                        self.__handshake_newest = self.__handshake_update
+                        self.__handshake_add = datetime.strptime(handshake['add'][0:18], '%Y-%m-%dT%H:%M:%S')
+                        if self.__handshake_add > self.__handshake_newest:
+                                self.__handshake_newest = self.__handshake_add
+                        self.__handshake_clean = datetime.strptime(handshake['clean'][0:18], '%Y-%m-%dT%H:%M:%S')
+                        if self.__handshake_clean > self.__handshake_newest:
+                                self.__handshake_newest = self.__handshake_clean
+
                         self.__handshake_auth = handshake['auth']
                         self.__handshake_songs = int(handshake['songs'])
 
-                        # cache file mtime >= handshake update time: load cached
-                        if os.path.exists(self.__cache_filename) and datetime.fromtimestamp(os.path.getmtime(self.__cache_filename)) >= self.__handshake_update:
+                        # cache file mtime >= newest handshake time: load cached
+                        if os.path.exists(self.__cache_filename) and datetime.fromtimestamp(os.path.getmtime(self.__cache_filename)) >= self.__handshake_newest:
                                 load_catalog()
                         else:
                                 self.download_catalog()
