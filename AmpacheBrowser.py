@@ -313,9 +313,9 @@ class AmpacheBrowser(RB.BrowserSource):
                                 if new_offset >= items:
                                         data[1].close()
 
-                                        # change modification time to update time
-                                        update_time = int(mktime(self.__handshake_update.timetuple()))
-                                        os.utime(cache_filename, (update_time, update_time))
+                                        # change modification time to newest time
+                                        newest_time = int(mktime(self.__handshake_newest.timetuple()))
+                                        os.utime(cache_filename, (newest_time, newest_time))
 
                                         # process next playlist
                                         download_iterate()
@@ -560,26 +560,30 @@ class AmpacheBrowser(RB.BrowserSource):
                                 print("error parsing handshake: %s" % e)
 
                         # convert handshake update time into datetime
-                        self.__handshake_update = datetime.strptime(
+                        handshake_update = datetime.strptime(
                                 handshake['update'][0:18],
                                 '%Y-%m-%dT%H:%M:%S')
-                        self.__handshake_newest = self.__handshake_update
-                        self.__handshake_add = datetime.strptime(handshake['add'][0:18], '%Y-%m-%dT%H:%M:%S')
-                        if self.__handshake_add > self.__handshake_newest:
-                                self.__handshake_newest = self.__handshake_add
-                        self.__handshake_clean = datetime.strptime(handshake['clean'][0:18], '%Y-%m-%dT%H:%M:%S')
-                        if self.__handshake_clean > self.__handshake_newest:
-                                self.__handshake_newest = self.__handshake_clean
+                        self.__handshake_newest = handshake_update
+                        handshake_add = datetime.strptime(
+                                handshake['add'][0:18],
+                                '%Y-%m-%dT%H:%M:%S')
+                        if handshake_add > self.__handshake_newest:
+                                self.__handshake_newest = handshake_add
+                        handshake_clean = datetime.strptime(
+                                handshake['clean'][0:18],
+                                '%Y-%m-%dT%H:%M:%S')
+                        if handshake_clean > self.__handshake_newest:
+                                self.__handshake_newest = handshake_clean
 
                         self.__handshake_auth = handshake['auth']
                         self.__handshake_songs = int(handshake['songs'])
 
-                        # cache file mtime >= handshake update time: load cached
+                        # cache file mtime >= handshake newest time: load cached
                         if not force_download and \
                                 os.path.exists(self.__songs_cache_filename) and \
                                 datetime.fromtimestamp(os.path.getmtime(
                                 self.__songs_cache_filename)) >= \
-                                self.__handshake_update:
+                                self.__handshake_newest:
                                 enumerate_cache_files()
                         else:
                                 # delete all cache files
