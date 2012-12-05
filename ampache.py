@@ -1,10 +1,6 @@
 # -*- Mode: python; coding: utf-8; tab-width: 8; indent-tabs-mode: t; -*-
 # vim: expandtab shiftwidth=8 softtabstop=8 tabstop=8
 
-# todo:
-# - do_deactivate: entry_delete_by_type() results in entry->refcount > 0
-#   assertion and Segmentation Fault
-
 import rb
 from gi.repository import RB
 from gi.repository import GObject, Peas, Gtk, Gio, GdkPixbuf
@@ -47,12 +43,12 @@ class Ampache(GObject.Object, Peas.Activatable):
                 what, width, height = Gtk.icon_size_lookup(Gtk.IconSize.LARGE_TOOLBAR)
                 icon = GdkPixbuf.Pixbuf.new_from_file_at_size(rb.find_plugin_file(self, 'ampache.ico'), width, height)
 
-                # fetch plugin settings
-                settings = Gio.Settings("org.gnome.rhythmbox.plugins.ampache")
-
                 # register AmpacheEntryType
                 self.__entry_type = AmpacheEntryType()
                 db.register_entry_type(self.__entry_type)
+
+                # fetch plugin settings
+                settings = Gio.Settings("org.gnome.rhythmbox.plugins.ampache")
 
                 # create AmpacheBrowser source
                 self.__source = GObject.new(
@@ -64,11 +60,13 @@ class Ampache(GObject.Object, Peas.Activatable):
                         settings=settings.get_child("source"),
                         name=_("Ampache")
                 )
+                self.__first = 1
 
                 # assign AmpacheEntryType to AmpacheBrowser source
                 shell.register_entry_type_for_source(
                         self.__source,
                         self.__entry_type)
+
 
                 # insert AmpacheBrowser source into Shared group
                 shell.append_display_page(
@@ -94,9 +92,14 @@ class Ampache(GObject.Object, Peas.Activatable):
                 ui_manager.ensure_update()
 
         def do_deactivate(self):
-                shell = self.object
+                # destroy AmpacheBrowser source
+                self.__source.delete_thyself()
+                self.__source = None
 
-                ui_manager = shell.props.ui_manager
+                # destroy entry type
+                self.__entry_type = None
+
+                ui_manager = self.object.props.ui_manager
 
                 # remove context menu
                 ui_manager.remove_ui(self.__ui_id)
@@ -105,21 +108,6 @@ class Ampache(GObject.Object, Peas.Activatable):
                 ui_manager.remove_action_group(self.__action_group)
                 self.__action_group = None
 
-#                self.db.entry_delete_by_type(self.__entry_type)
-#                self.db.commit()
-#                self.db = None
-
-                self.__entry_type = None
-
-                # delete AmpacheBrowser source
-                self.__source.delete_thyself()
-                self.__source = None
-
         def refetch_ampache(self, widget):
-                shell = self.object
-
-#                db = shell.props.db
-#                db.entry_delete_by_type(self.__entry_type)
-#                db.commit()
-
+                self.__source.clean_db()
                 self.__source.update(True)
