@@ -73,24 +73,6 @@ class Ampache(GObject.Object, Peas.Activatable):
                         self.__source,
                         RB.DisplayPageGroup.get_by_id("shared"))
 
-                # add action RefetchAmpache and assign callback refetch_ampache
-                action = Gtk.Action('RefetchAmpache',
-                                    _('_Refetch Ampache Library'),
-                                    _('Update the local ampache library'),
-                                    '')
-                action.connect('activate', self.refetch_ampache)
-
-                self.__action_group = Gtk.ActionGroup('AmpacheActions')
-                self.__action_group.add_action(action)
-
-                ui_manager = shell.props.ui_manager
-
-                ui_manager.insert_action_group(self.__action_group, -1)
-
-                # add context menu
-                self.__ui_id = ui_manager.add_ui_from_string(popup_ui)
-                ui_manager.ensure_update()
-
         def do_deactivate(self):
                 # destroy AmpacheBrowser source
                 self.__source.delete_thyself()
@@ -98,16 +80,3 @@ class Ampache(GObject.Object, Peas.Activatable):
 
                 # destroy entry type
                 self.__entry_type = None
-
-                ui_manager = self.object.props.ui_manager
-
-                # remove context menu
-                ui_manager.remove_ui(self.__ui_id)
-
-                # remove action group
-                ui_manager.remove_action_group(self.__action_group)
-                self.__action_group = None
-
-        def refetch_ampache(self, widget):
-                self.__source.clean_db()
-                self.__source.update(True)

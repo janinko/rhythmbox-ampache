@@ -203,15 +203,27 @@ class AmpacheBrowser(RB.BrowserSource):
 
                 self.__activated = False
 
-        def do_show_popup(self):
-                if self.__activated:
-                        self.__popup.popup(
-                                None,
-                                None,
-                                None,
-                                None,
-                                3,
-                                Gtk.get_current_event_time())
+                # add action RefetchAmpache and assign callback refetch_ampache
+                app = Gio.Application.get_default()
+                action = Gio.SimpleAction(name='refetch-ampache')
+                action.connect('activate', self.refetch_ampache)
+                app.add_action(action)
+
+                self.__popup = Gio.Menu()
+                section = Gio.Menu()
+                section.append('Refetch Ampache Data', 'app.refetch-ampache')
+                self.__popup.append_section(None, section)
+
+        def do_impl_show_entry_popup(self):
+                menu = Gtk.Menu.new_from_model(self.__popup)
+                menu.attach_to_widget(self, None)
+                menu.popup(
+                        None,
+                        None,
+                        None,
+                        None,
+                        3,
+                        Gtk.get_current_event_time())
 
         def update(self, force_download):
 
@@ -676,9 +688,6 @@ class AmpacheBrowser(RB.BrowserSource):
                         self.__art_store = RB.ExtDB(name="album-art")
                         self.__art_request = self.__art_store.connect("request", self.__album_art_requested)
 
-                        # get popup menu
-                        self.__popup = self.__shell.props.ui_manager.get_widget('/AmpacheSourceViewPopup')
-
                         # create cache directory if it doesn't exist
                         cache_path = os.path.dirname(self.__songs_cache_filename)
                         if not os.path.exists(cache_path):
@@ -686,9 +695,19 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         self.update(False)
 
+                        app = Gio.Application.get_default()
+
+                        # add plugin menu item (note the "app." prefix here)
+                        item = Gio.MenuItem()
+                        item.set_label('Refetch Ampache')
+                        item.set_detailed_action('app.refetch-ampache')
+                        app.add_plugin_menu_item('browser-popup', 'mi-refetch-ampache', item)
+
+        def do_deactivate(self):
+                Gio.Application.get_default().remove_plugin_menu_item('browser-popup', 'mi-refetch.ampache')
+
         # Shortcut for single click
         def do_selected(self):
-                print("activate")
                 self.do_activate()
 
         def __album_art_requested(self, store, key, last_time):
@@ -708,6 +727,10 @@ class AmpacheBrowser(RB.BrowserSource):
                 self.__db.entry_delete_by_type(self.__entry_type)
                 self.__db.commit()
                 # self.__entries should be deleted, but here it's too soon, now it just grows on each update
+
+        def refetch_ampache(self):
+                self.clean_db()
+                self.update(True)
 
         def do_delete_thyself(self):
 
