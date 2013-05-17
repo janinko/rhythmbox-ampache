@@ -8,14 +8,6 @@ from gi.repository import GObject, Peas, Gtk, Gio, GdkPixbuf
 from AmpacheConfigDialog import AmpacheConfigDialog
 from AmpacheBrowser import AmpacheBrowser
 
-popup_ui = """
-<ui>
-  <popup name="AmpacheSourceViewPopup">
-    <menuitem name="RefetchAmpacheLibrary" action="RefetchAmpache"/>
-  </popup>
-</ui>
-"""
-
 class AmpacheEntryType(RB.RhythmDBEntryType):
         def __init__(self):
                 RB.RhythmDBEntryType.__init__(
@@ -50,6 +42,9 @@ class Ampache(GObject.Object, Peas.Activatable):
                 # fetch plugin settings
                 settings = Gio.Settings("org.gnome.rhythmbox.plugins.ampache")
 
+                menu = Gio.Menu()
+                menu.append('Refetch Ampache Library', 'app.refetch-ampache')
+
                 # create AmpacheBrowser source
                 self.__source = GObject.new(
                         AmpacheBrowser,
@@ -58,6 +53,7 @@ class Ampache(GObject.Object, Peas.Activatable):
                         pixbuf=icon,
                         plugin=self,
                         settings=settings.get_child("source"),
+                        toolbar_menu=menu,
                         name=_("Ampache")
                 )
                 self.__first = 1

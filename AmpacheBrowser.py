@@ -209,22 +209,6 @@ class AmpacheBrowser(RB.BrowserSource):
                 action.connect('activate', self.refetch_ampache)
                 app.add_action(action)
 
-                self.__popup = Gio.Menu()
-                section = Gio.Menu()
-                section.append('Refetch Ampache Data', 'app.refetch-ampache')
-                self.__popup.append_section(None, section)
-
-        def do_impl_show_entry_popup(self):
-                menu = Gtk.Menu.new_from_model(self.__popup)
-                menu.attach_to_widget(self, None)
-                menu.popup(
-                        None,
-                        None,
-                        None,
-                        None,
-                        3,
-                        Gtk.get_current_event_time())
-
         def update(self, force_download):
 
                 ### download songs from Ampache server
@@ -695,17 +679,6 @@ class AmpacheBrowser(RB.BrowserSource):
 
                         self.update(False)
 
-                        app = Gio.Application.get_default()
-
-                        # add plugin menu item (note the "app." prefix here)
-                        item = Gio.MenuItem()
-                        item.set_label('Refetch Ampache')
-                        item.set_detailed_action('app.refetch-ampache')
-                        app.add_plugin_menu_item('browser-popup', 'mi-refetch-ampache', item)
-
-        def do_deactivate(self):
-                Gio.Application.get_default().remove_plugin_menu_item('browser-popup', 'mi-refetch.ampache')
-
         # Shortcut for single click
         def do_selected(self):
                 self.do_activate()
@@ -728,7 +701,7 @@ class AmpacheBrowser(RB.BrowserSource):
                 self.__db.commit()
                 # self.__entries should be deleted, but here it's too soon, now it just grows on each update
 
-        def refetch_ampache(self):
+        def refetch_ampache(self, parameter, user_data):
                 self.clean_db()
                 self.update(True)
 
